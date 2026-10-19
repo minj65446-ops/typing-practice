@@ -1,0 +1,5 @@
+_scrape/
+_shot*.png
+_*.py
+content.json
+_edge*/

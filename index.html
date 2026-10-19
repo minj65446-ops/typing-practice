@@ -1,0 +1,530 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0b0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>打字练习 · Typing</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --panel: #111823;
+    --line: #1f2a37;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --ok: #3fb950;
+    --bad: #f85149;
+    --warn: #d29922;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    overscroll-behavior: none;
+  }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+
+  header {
+    padding: 12px 14px 8px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 8px; flex-wrap: wrap;
+  }
+  .brand { font-size: 17px; font-weight: 700; letter-spacing: .5px; }
+  .brand span { color: var(--accent); }
+  .modes { display: flex; gap: 6px; }
+  .modes button {
+    background: var(--panel); color: var(--muted); border: 1px solid var(--line);
+    padding: 6px 10px; border-radius: 999px; font-size: 12px; cursor: pointer;
+  }
+  .modes button.on { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,.1); }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 6px; padding: 0 14px 6px;
+  }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 4px; text-align: center; min-width: 0; }
+  .stat b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stat i { font-style: normal; font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+  .stage {
+    flex: 1; display: flex; flex-direction: column; justify-content: center;
+    padding: 10px 16px 8px;
+  }
+  #target {
+    font-family: "JetBrains Mono", Consolas, "Courier New", monospace;
+    font-size: clamp(18px, 5vw, 26px);
+    line-height: 1.85;
+    letter-spacing: .4px;
+    word-break: break-word;
+    white-space: pre-wrap;
+    user-select: none;
+  }
+  #target .c { color: var(--muted); }
+  #target .ok { color: var(--ok); }
+  #target .bad { color: #ff7b72; background: rgba(248,81,73,.18); border-radius: 3px; }
+  #target .cur { color: var(--text); border-bottom: 2px solid var(--accent); }
+  #target.zh { font-family: "PingFang SC", "Microsoft YaHei", "Songti SC", sans-serif; letter-spacing: .5px; }
+
+  .hintline { padding: 0 18px; color: var(--muted); font-size: 13px; min-height: 20px; }
+
+  footer { padding: 10px 18px 20px; display: flex; gap: 10px; align-items: center; }
+  footer button {
+    flex: 1; padding: 13px 16px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+  footer button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
+  footer button:active { transform: scale(.99); }
+
+  #hidden {
+    position: fixed; left: 0; bottom: 0; width: 1px; height: 1px;
+    opacity: 0; border: 0; padding: 0; background: transparent; color: transparent;
+  }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(3,6,10,.78);
+    display: none; align-items: center; justify-content: center; padding: 22px; z-index: 20;
+  }
+  .overlay.show { display: flex; }
+  .result {
+    width: 100%; max-width: 420px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 18px; padding: 22px;
+  }
+  .result h2 { margin: 0 0 4px; font-size: 20px; }
+  .result p.sub { margin: 0 0 16px; color: var(--muted); font-size: 13px; }
+  .result .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .result .grid div { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .result .grid b { display: block; font-size: 22px; }
+  .result .grid i { font-style: normal; font-size: 11px; color: var(--muted); }
+  .result .words { color: var(--bad); font-size: 13px; margin: 0 0 16px; line-height: 1.6; }
+  .result .btns { display: flex; gap: 10px; }
+  .result .btns button {
+    flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: transparent; color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .result .btns button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">⌨️ 打字练习<span>.</span></div>
+  <div class="modes" id="modes"></div>
+</header>
+
+<div class="stats">
+  <div class="stat"><b id="wpm">0</b><i id="unitLabel">WPM</i></div>
+  <div class="stat"><b id="acc">100%</b><i>准确率</i></div>
+  <div class="stat"><b id="combo">0</b><i>连击</i></div>
+  <div class="stat"><b id="time">60</b><i>秒</i></div>
+</div>
+
+<div class="stage">
+  <div id="target"></div>
+</div>
+<div class="hintline" id="hintline">点下方「开始」后，用键盘输入上方文字</div>
+
+<footer>
+  <button id="startBtn" class="primary">开始</button>
+  <button id="stopBtn">结束</button>
+</footer>
+
+<input id="hidden" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" inputmode="text" enterkeyhint="done">
+
+<div class="overlay" id="overlay">
+  <div class="result">
+    <h2 id="rTitle">本局结束</h2>
+    <p class="sub" id="rSub"></p>
+    <div class="grid">
+      <div><b id="rWpm">0</b><i id="rUnit">WPM 速度</i></div>
+      <div><b id="rAcc">0%</b><i>准确率</i></div>
+      <div><b id="rChars">0</b><i>正确字符</i></div>
+      <div><b id="rTime">0s</b><i>用时</i></div>
+    </div>
+    <div class="words" id="rWords"></div>
+    <div class="btns">
+      <button id="againBtn" class="primary">再来一局</button>
+      <button id="wrongBtn">只练错词</button>
+    </div>
+  </div>
+</div>
+
+<script src="content.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ---------- 内容库 ----------
+  const WORDS = ("time year people way day man thing woman life child world school state family student " +
+    "group country problem hand part place case week company system program question work number night " +
+    "point home water room mother area money story fact month right study book eye job word business " +
+    "issue side kind head house service friend father power hour game line member city community name " +
+    "team minute idea body information back parent face level office door health person art history party " +
+    "result change morning reason research girl moment air teacher force education foot boy age policy " +
+    "process music market sense nation plan college interest death experience effect use class control care " +
+    "field development role effort rate heart light voice price report decision view town road arm " +
+    "difference value building action model season society tax director position player record paper space " +
+    "ground form event official matter center couple site project activity star table need court " +
+    "production teach phone test write read talk walk run play learn drive watch").split(" ");
+
+  const SENTENCES = [
+    "the quick brown fox jumps over the lazy dog",
+    "practice makes perfect so keep typing every day",
+    "a good programmer reads code more than writes it",
+    "small steps every day lead to big results",
+    "the best way to learn is to build something real",
+    "keep your hands on the home row and your eyes on the screen",
+    "speed comes after accuracy so slow down first",
+    "every mistake is a chance to learn something new",
+    "the computer does exactly what you tell it to do",
+    "write tests before code and you will sleep better",
+    "a journey of a thousand miles begins with a single step",
+    "work hard in silence let success make the noise"
+  ];
+
+  const SYMBOLS = [
+    "const x = 42;",
+    "if (a > b) { return a; }",
+    "function add(a, b) { return a + b; }",
+    "for (let i = 0; i < 10; i++) {}",
+    "print('hello world')",
+    "arr.filter(x => x > 0)",
+    "SELECT * FROM users WHERE id = 1;",
+    "git commit -m 'init'",
+    '{"name": "typing", "ok": true}',
+    "a != b && c <= d"
+  ];
+
+  const TIME_OPTIONS = [30, 60, 120, 0]; // 0 = 不限时
+
+  // ---------- 状态 ----------
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    modes: $("modes"), target: $("target"), hidden: $("hidden"),
+    wpm: $("wpm"), acc: $("acc"), combo: $("combo"), time: $("time"), unitLabel: $("unitLabel"),
+    startBtn: $("startBtn"), stopBtn: $("stopBtn"), hintline: $("hintline"),
+    overlay: $("overlay"), rTitle: $("rTitle"), rSub: $("rSub"),
+    rWpm: $("rWpm"), rAcc: $("rAcc"), rChars: $("rChars"), rTime: $("rTime"),
+    rWords: $("rWords"), againBtn: $("againBtn"), wrongBtn: $("wrongBtn"), rUnit: $("rUnit")
+  };
+
+  const state = {
+    running: false,
+    mode: "words",
+    duration: 60,
+    remaining: 60,
+    target: "",
+    typed: "",
+    startAt: 0,
+    elapsed: 0,
+    timer: null,
+    correct: 0,
+    totalTyped: 0,
+    combo: 0,
+    maxCombo: 0,
+    roundErrors: [],
+    wrongBank: loadWrong(),
+    practiceWrong: false,
+    currentPassage: null
+  };
+
+  function loadWrong() {
+    try { return JSON.parse(localStorage.getItem("typing.wrong") || "[]"); }
+    catch (e) { return []; }
+  }
+  function saveWrong() {
+    try { localStorage.setItem("typing.wrong", JSON.stringify(state.wrongBank.slice(0, 200))); }
+    catch (e) {}
+  }
+
+  // ---------- 模式按钮 ----------
+  const modeDefs = [
+    { key: "words", label: "单词" },
+    { key: "sentences", label: "句子" },
+    { key: "symbols", label: "符号" },
+    { key: "zh", label: "文章" }
+  ];
+  modeDefs.forEach((m) => {
+    const b = document.createElement("button");
+    b.textContent = m.label;
+    b.dataset.mode = m.key;
+    b.addEventListener("click", () => {
+      if (state.running) return;
+      state.mode = m.key;
+      state.practiceWrong = false;
+      renderModes();
+      newRound(true);
+    });
+    el.modes.appendChild(b);
+  });
+  function renderModes() {
+    [...el.modes.children].forEach((b) => b.classList.toggle("on", b.dataset.mode === state.mode));
+  }
+
+  // ---------- 生成一轮 ----------
+  function pickZhTarget() {
+    const pool = window.PASSAGES || [];
+    if (!pool.length) return "未加载到文章内容";
+    const p = pool[Math.floor(Math.random() * pool.length)];
+    state.currentPassage = p;
+    const clean = p.text.replace(/\s+/g, "");
+    const want = 36 + Math.floor(Math.random() * 24);   // 每轮 36-59 字
+    const start = Math.floor(Math.random() * Math.max(1, clean.length - want));
+    return clean.slice(start, start + want);
+  }
+
+  function makeTarget() {
+    if (state.mode === "zh") return pickZhTarget();
+    if (state.practiceWrong && state.wrongBank.length) {
+      const pool = state.wrongBank.filter(Boolean);
+      const n = Math.min(pool.length, 10);
+      const picked = [];
+      while (picked.length < n) {
+        const w = pool[Math.floor(Math.random() * pool.length)];
+        if (!picked.includes(w)) picked.push(w);
+      }
+      return picked.join(" ");
+    }
+    if (state.mode === "sentences") {
+      return SENTENCES[Math.floor(Math.random() * SENTENCES.length)];
+    }
+    if (state.mode === "symbols") {
+      return SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    }
+    const n = 10;
+    const picked = [];
+    while (picked.length < n) {
+      const w = WORDS[Math.floor(Math.random() * WORDS.length)];
+      if (!picked.includes(w)) picked.push(w);
+    }
+    return picked.join(" ");
+  }
+
+  function newRound(first) {
+    state.target = makeTarget();
+    state.typed = "";
+    el.hidden.value = "";
+    el.target.classList.toggle("zh", state.mode === "zh");
+    if (state.mode === "zh") {
+      const p = state.currentPassage || { title: "", category: "" };
+      el.hintline.textContent = "《" + p.title + "》· " + p.category + " · 本轮 " + state.target.length + " 字";
+    } else {
+      el.hintline.textContent = state.practiceWrong ? "错词重练模式" : "输入上方文字，完成一轮自动继续";
+    }
+    render();
+    if (first) focusHidden();
+  }
+
+  function focusHidden() {
+    el.hidden.focus({ preventScroll: true });
+  }
+
+  // ---------- 渲染 ----------
+  function render() {
+    const t = state.target, typed = state.typed;
+    let html = "";
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i] === " " ? " " : escapeHtml(t[i]);
+      let cls = "c";
+      if (i < typed.length) cls = typed[i] === t[i] ? "ok" : "bad";
+      else if (i === typed.length) cls = "cur";
+      html += '<span class="' + cls + '">' + ch + "</span>";
+    }
+    el.target.innerHTML = html;
+  }
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- 统计 ----------
+  function updateStats() {
+    const minutes = Math.max(state.elapsed / 60, 1 / 600);
+    const acc = state.totalTyped ? Math.round((state.correct / state.totalTyped) * 100) : 100;
+    if (state.mode === "zh") {
+      el.wpm.textContent = String(Math.round(state.correct / minutes));
+      el.unitLabel.textContent = "字/分";
+    } else {
+      el.wpm.textContent = String(Math.round((state.correct / 5) / minutes));
+      el.unitLabel.textContent = "WPM";
+    }
+    el.acc.textContent = acc + "%";
+    el.combo.textContent = String(state.combo);
+    if (state.duration) el.time.textContent = String(Math.max(0, Math.ceil(state.remaining)));
+    else el.time.textContent = String(Math.round(state.elapsed));
+  }
+
+  // ---------- 开始 / 结束 ----------
+  function start() {
+    if (state.running) return;
+    state.running = true;
+    state.elapsed = 0;
+    state.correct = 0;
+    state.totalTyped = 0;
+    state.combo = 0;
+    state.maxCombo = 0;
+    state.roundErrors = [];
+    state.remaining = state.duration;
+    state.startAt = performance.now();
+    newRound(true);
+    el.startBtn.textContent = "重新开始";
+    el.startBtn.classList.remove("primary");
+    updateStats();
+    clearInterval(state.timer);
+    state.timer = setInterval(tick, 100);
+  }
+
+  function tick() {
+    if (!state.running) return;
+    state.elapsed = (performance.now() - state.startAt) / 1000;
+    if (state.duration) {
+      state.remaining = state.duration - state.elapsed;
+      if (state.remaining <= 0) { finish("时间到"); return; }
+    }
+    updateStats();
+  }
+
+  function finish(reason) {
+    if (!state.running) return;
+    state.running = false;
+    clearInterval(state.timer);
+    state.elapsed = (performance.now() - state.startAt) / 1000;
+    updateStats();
+    el.overlay.classList.add("show");
+    el.rTitle.textContent = reason || "本局结束";
+    const minutes = Math.max(state.elapsed / 60, 1 / 600);
+    if (state.mode === "zh") {
+      el.rWpm.textContent = String(Math.round(state.correct / minutes));
+      el.rUnit.textContent = "字/分钟";
+    } else {
+      el.rWpm.textContent = String(Math.round((state.correct / 5) / minutes));
+      el.rUnit.textContent = "WPM 速度";
+    }
+    el.rAcc.textContent = (state.totalTyped ? Math.round((state.correct / state.totalTyped) * 100) : 100) + "%";
+    el.rChars.textContent = String(state.correct);
+    el.rTime.textContent = String(Math.round(state.elapsed)) + "s";
+    el.rSub.textContent = state.practiceWrong ? "错词重练模式" : "继续加油，保持每天练习";
+    const errs = [...new Set(state.roundErrors)].slice(0, 12);
+    el.rWords.textContent = errs.length ? "错词：" + errs.join("  ") : "本轮全部正确 🎉";
+    el.wrongBtn.style.display = (state.wrongBank.length && state.mode !== "zh") ? "block" : "none";
+    el.hidden.blur();
+  }
+
+  // ---------- 输入处理 ----------
+  el.hidden.addEventListener("input", (e) => {
+    if (e.isComposing) return;
+    if (!state.running) start();
+    handleValue(el.hidden.value);
+  });
+
+  el.hidden.addEventListener("keydown", (e) => {
+    if (!state.running) return;
+    if (e.key === "Enter") { e.preventDefault(); e.target.blur(); }
+  });
+
+  function handleValue(val) {
+    // 只接受 ASCII 可见字符，过滤移动输入法自动补全
+    val = val.replace(/[\u0000-\u001F\u007F]/g, "");
+    if (val.length > state.target.length) val = val.slice(0, state.target.length);
+
+    // 回退时不再计入统计（简化处理）
+    if (val.length < state.typed.length) {
+      state.typed = val;
+      render();
+      return;
+    }
+
+    // 计算新增字符
+    for (let i = state.typed.length; i < val.length; i++) {
+      state.totalTyped++;
+      if (val[i] === state.target[i]) {
+        state.correct++;
+        state.combo++;
+        state.maxCombo = Math.max(state.maxCombo, state.combo);
+      } else {
+        state.combo = 0;
+        const word = currentWordAt(i);
+        if (word) state.roundErrors.push(word);
+      }
+    }
+    state.typed = val;
+    render();
+    updateStats();
+
+    if (state.typed.length >= state.target.length) {
+      if (state.mode !== "zh") collectWrongWords();
+      newRound(false);
+    }
+  }
+
+  function currentWordAt(idx) {
+    const before = state.target.slice(0, idx);
+    const after = state.target.slice(idx);
+    const start = before.lastIndexOf(" ") + 1;
+    const m = after.match(/\S+/);
+    const end = m ? idx + m[0].length : state.target.length;
+    return state.target.slice(start, end);
+  }
+
+  function collectWrongWords() {
+    const t = state.target, typed = state.typed;
+    // 按空格切词，逐词比对
+    const tw = t.split(" ");
+    const pw = typed.split(" ");
+    tw.forEach((word, i) => {
+      if (pw[i] !== word) addWrong(word);
+    });
+  }
+
+  function addWrong(word) {
+    if (!word) return;
+    word = word.trim();
+    if (!/^[A-Za-z0-9_]+$/.test(word)) return;
+    if (!state.wrongBank.includes(word)) {
+      state.wrongBank.unshift(word);
+      if (state.wrongBank.length > 100) state.wrongBank.pop();
+      saveWrong();
+    }
+  }
+
+  // ---------- 按钮 ----------
+  el.startBtn.addEventListener("click", () => {
+    if (el.overlay.classList.contains("show")) el.overlay.classList.remove("show");
+    start();
+    focusHidden();
+  });
+
+  el.stopBtn.addEventListener("click", () => finish("手动结束"));
+
+  el.againBtn.addEventListener("click", () => {
+    el.overlay.classList.remove("show");
+    start();
+    focusHidden();
+  });
+
+  el.wrongBtn.addEventListener("click", () => {
+    el.overlay.classList.remove("show");
+    state.practiceWrong = true;
+    start();
+    focusHidden();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && state.running) finish("页面切走，本局结束");
+  });
+
+  // ---------- 启动 ----------
+  const qMode = new URLSearchParams(location.search).get("mode");
+  if (["words", "sentences", "symbols", "zh"].includes(qMode)) state.mode = qMode;
+  state.duration = 60;
+  renderModes();
+  newRound(false);
+  updateStats();
+  el.target.addEventListener("click", focusHidden);
+})();
+</script>
+</body>
+</html>
+
+
+
