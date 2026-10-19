@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>手机打字训练 · MobiType</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #111823; --line: #1f2a37; --text: #e6edf3;
+    --muted: #8b949e; --accent: #58a6ff; --ok: #3fb950; --bad: #f85149;
+    --gold: #d29922;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+
+  /* 顶部 */
+  .top { padding: 10px 12px 6px; }
+  .row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .brand { font-size: 15px; font-weight: 700; }
+  .brand em { color: var(--accent); font-style: normal; }
+  .dur { display: flex; gap: 5px; }
+  .dur button, .modebar button {
+    background: var(--panel); color: var(--muted); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px 9px; font-size: 12px; cursor: pointer;
+  }
+  .dur button.on { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,.1); }
+  .modebar { display: flex; gap: 5px; overflow-x: auto; padding: 8px 0 4px; scrollbar-width: none; }
+  .modebar::-webkit-scrollbar { display: none; }
+  .modebar button { white-space: nowrap; font-size: 12px; padding: 6px 10px; }
+  .modebar button.on { color: var(--accent); border-color: var(--accent); background: rgba(88,166,255,.1); }
+
+  /* 统计 */
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 6px; padding: 4px 12px 6px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 4px; text-align: center; }
+  .stat b { display: block; font-size: 17px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stat i { font-style: normal; font-size: 10px; color: var(--muted); white-space: nowrap; }
+
+  /* 进度条 */
+  .bar { height: 3px; background: var(--line); margin: 0 12px; border-radius: 99px; overflow: hidden; }
+  .bar > div { height: 100%; width: 100%; background: var(--accent); transition: width .1s linear; }
+
+  /* 主区 */
+  .stage { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 8px 16px; text-align: center; }
+  #target { font-size: clamp(22px, 6.4vw, 30px); line-height: 1.75; letter-spacing: .5px; word-break: break-word; }
+  #target .c { color: var(--muted); }
+  #target .ok { color: var(--ok); }
+  #target .bad { color: #ff7b72; background: rgba(248,81,73,.18); border-radius: 4px; }
+  #target .cur { color: var(--text); border-bottom: 2px solid var(--accent); }
+  #target.mono { font-family: "JetBrains Mono", Consolas, monospace; word-break: break-all; }
+  .hint { color: var(--muted); font-size: 12px; text-align: center; padding: 0 16px 6px; min-height: 18px; }
+
+  /* 底部按钮 */
+  .foot { padding: 8px 12px calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+  .foot button { flex: 1; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--text); font-size: 15px; font-weight: 600; }
+  .foot button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
+  .foot button:active { transform: scale(.99); }
+
+  #hidden { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; }
+  #hidden { color: transparent; background: transparent; }
+
+  /* 结算 */
+  .overlay { position: fixed; inset: 0; background: rgba(3,6,10,.82); display: none; align-items: center; justify-content: center; padding: 18px; z-index: 20; }
+  .overlay.show { display: flex; }
+  .result { width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; }
+  .result h2 { margin: 0 0 2px; font-size: 22px; }
+  .result .grade { font-size: 13px; color: var(--gold); margin-bottom: 14px; }
+  .result .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .result .grid div { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .result .grid b { display: block; font-size: 20px; }
+  .result .grid i { font-style: normal; font-size: 10px; color: var(--muted); }
+  .result p { margin: 8px 0; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .result p b { color: var(--bad); }
+  .result .btns { display: flex; gap: 8px; margin-top: 12px; }
+  .result .btns button { flex: 1; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: transparent; color: var(--text); font-size: 14px; font-weight: 600; }
+  .result .btns button.primary { background: var(--accent); border-color: var(--accent); color: #04121f; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="row1">
+    <div class="brand">📱 手机打字训练<em>.</em></div>
+    <div class="dur" id="durs"></div>
+  </div>
+  <div class="modebar" id="modes"></div>
+</div>
+
+<div class="stats">
+  <div class="stat"><b id="speed">0</b><i id="speedUnit">字/分</i></div>
+  <div class="stat"><b id="acc">100%</b><i>准确率</i></div>
+  <div class="stat"><b id="combo">0</b><i>连击</i></div>
+  <div class="stat"><b id="time">30</b><i>秒</i></div>
+</div>
+<div class="bar"><div id="progress"></div></div>
+
+<div class="stage">
+  <div id="target">点「开始」，用你手机的输入法打出上方短语</div>
+</div>
+<div class="hint" id="hint"></div>
+
+<div class="foot">
+  <button id="startBtn" class="primary">开始</button>
+  <button id="stopBtn">结束</button>
+</div>
+
+<input id="hidden" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+
+<div class="overlay" id="overlay">
+  <div class="result">
+    <h2 id="rTitle">本局结束</h2>
+    <div class="grade" id="rGrade"></div>
+    <div class="grid">
+      <div><b id="rSpeed">0</b><i id="rSpeedUnit">字/分钟</i></div>
+      <div><b id="rAcc">0%</b><i>准确率</i></div>
+      <div><b id="rBack">0</b><i>回退次数</i></div>
+      <div><b id="rFirst">0s</b><i>首字平均</i></div>
+    </div>
+    <p id="rWrong"></p>
+    <div class="btns">
+      <button id="againBtn" class="primary">再来一局</button>
+      <button id="wrongBtn">专练易错字</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ================= 词库 =================
+  // 聊天高频短句（手机输入最常见的表达）
+  const CHAT = [
+    "好的", "收到", "没问题", "可以", "行", "嗯嗯", "哦哦", "好的好的",
+    "哈哈哈", "哈哈哈哈", "笑死", "绝了", "太离谱了", "真的假的", "不会吧",
+    "在吗", "在干嘛", "吃饭了吗", "睡了没", "马上到", "马上就来", "我到了",
+    "等一下", "等等我", "我看看", "我想想", "我知道了", "我明白了", "你说得对",
+    "今天好累", "好困啊", "晚安", "早安", "明天见", "回头聊", "先这样",
+    "谢谢", "谢谢你", "太感谢了", "不客气", "对不起", "没事", "没关系",
+    "我请你吃饭", "你在哪里", "几点集合", "什么时候", "多少钱", "在哪里",
+    "发个定位", "打给我", "回我消息", "接电话", "快递到了", "外卖到了",
+    "帮我个忙", "帮我看下", "你觉得呢", "怎么样", "为什么", "怎么办",
+    "好麻烦", "太简单了", "有点意思", "我也觉得", "确实如此", "应该是吧",
+    "我不同意", "再想想", "别着急", "慢慢来", "加油", "你可以的",
+    "注意安全", "早点休息", "多喝热水", "路上小心", "记得吃饭", "别熬夜",
+    "哈哈真的", "笑不活了", "救命啊", "我裂开了", "太难了", "麻了",
+    "这个不错", "那个更好", "随便都行", "听你的", "你决定", "都可以",
+    "我刚才在忙", "等会儿说", "现在方便吗", "晚点聊", "先挂了", "拜拜",
+    "好家伙", "不对劲", "有点困", "饿了", "渴了", "下雨了", "好热啊", "好冷啊"
+  ];
+
+  // 拼音音节（练 26 键拇指准确度：切英文键盘，练声母韵母组合键位）
+  const PINYIN = [
+    "zh", "ch", "sh", "ang", "eng", "ing", "ong", "uang", "iang", "iong",
+    "zhuang", "chuang", "shuang", "cheng", "zhang", "shang", "zheng", "chang",
+    "xiong", "qiong", "ping", "ming", "ning", "ting", "ling", "jing", "qing",
+    "wang", "yang", "guang", "kuang", "huang", "beng", "peng", "meng", "feng",
+    "deng", "teng", "neng", "leng", "geng", "keng", "heng", "zeng", "ceng", "seng",
+    "zhong", "chong", "shong", "cong", "song", "zong", "rong", "yong", "xing"
+  ];
+
+  // 数字与标点（手机高频场景）
+  const NUM = [
+    "13800138000", "2026-10-19", "10:30", "¥29.9", "¥128", "+86 13800138000",
+    "10086", "12345", "3.14159", "1/2", "50%", "3:1", "A4", "B2", "C-3PO",
+    "（备注）", "【重要】", "……", "？！", "~", "@某人", "#话题#", "第1条",
+    "2026年10月19日", "下午3点", "2号楼301", "尾号8888", "订单号20261019",
+    "￥99.00", "打8折", "满100减20", "顺丰快递", "验证码1234", "密码6位"
+  ];
+
+  // 文章模式（复用 content.js 里的抓取文章）
+  const ARTICLES = window.PASSAGES || [];
+
+  // ================= 模式 =================
+  const MODES = [
+    { key: "chat", label: "聊天高频", unit: "字/分", hint: "用你习惯的输入法直接打，练真实聊天速度" },
+    { key: "wrong", label: "易错回炉", unit: "字/分", hint: "只练你以前打错的字，直到不犯错" },
+    { key: "num", label: "数字标点", unit: "键/分", hint: "手机高频数字与符号：手机号、金额、日期" },
+    { key: "pinyin", label: "拼音键位", unit: "键/分", hint: "把键盘切到英文，练 26 键拇指准确度" },
+    { key: "article", label: "文章耐力", unit: "字/分", hint: "长文连续输入，练耐力和节奏" }
+  ];
+  const DURATIONS = [30, 60, 90];
+
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    durs: $("durs"), modes: $("modes"), target: $("target"), hint: $("hint"),
+    speed: $("speed"), speedUnit: $("speedUnit"), acc: $("acc"), combo: $("combo"), time: $("time"),
+    progress: $("progress"), startBtn: $("startBtn"), stopBtn: $("stopBtn"),
+    hidden: $("hidden"), overlay: $("overlay"),
+    rTitle: $("rTitle"), rGrade: $("rGrade"), rSpeed: $("rSpeed"), rSpeedUnit: $("rSpeedUnit"),
+    rAcc: $("rAcc"), rBack: $("rBack"), rFirst: $("rFirst"), rWrong: $("rWrong"),
+    againBtn: $("againBtn"), wrongBtn: $("wrongBtn")
+  };
+
+  const S = {
+    running: false, mode: "chat", duration: 30, remaining: 30,
+    target: "", typed: "", startAt: 0, elapsed: 0, timer: null,
+    correct: 0, totalTyped: 0, combo: 0, maxCombo: 0, backspaces: 0,
+    rounds: 0, firstDelaySum: 0, firstDelayCount: 0, roundStart: 0,
+    roundErrors: [], wrongChars: load("mobitype.wrongChars", {}),
+    best: load("mobitype.best", {}), lastTitle: ""
+  };
+
+  function load(k, def) {
+    try { return JSON.parse(localStorage.getItem(k)) || def; } catch (e) { return def; }
+  }
+  function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+  // ================= 界面构建 =================
+  DURATIONS.forEach((d) => {
+    const b = document.createElement("button");
+    b.textContent = d + "s";
+    b.dataset.dur = d;
+    b.addEventListener("click", () => {
+      if (S.running) return;
+      S.duration = d; S.remaining = d;
+      renderDurs(); updateStats();
+    });
+    el.durs.appendChild(b);
+  });
+  function renderDurs() {
+    [...el.durs.children].forEach((b) => b.classList.toggle("on", +b.dataset.dur === S.duration));
+  }
+
+  MODES.forEach((m) => {
+    const b = document.createElement("button");
+    b.textContent = m.label;
+    b.dataset.mode = m.key;
+    b.addEventListener("click", () => {
+      S.mode = m.key;
+      if (S.running) finish("切换模式");
+      renderModes();
+      resetRound(true);
+    });
+    el.modes.appendChild(b);
+  });
+  function renderModes() {
+    [...el.modes.children].forEach((b) => b.classList.toggle("on", b.dataset.mode === S.mode));
+    el.speedUnit.textContent = modeDef().unit;
+    el.rSpeedUnit.textContent = modeDef().unit.replace("/分", "/分钟");
+  }
+  function modeDef() { return MODES.find((m) => m.key === S.mode) || MODES[0]; }
+
+  // ================= 出题 =================
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function wrongBankWords() {
+    const chars = Object.keys(S.wrongChars);
+    if (!chars.length) return [];
+    return CHAT.filter((p) => [...p].some((c) => S.wrongChars[c]));
+  }
+
+  function nextTarget() {
+    if (S.mode === "pinyin") return pick(PINYIN);
+    if (S.mode === "num") return pick(NUM);
+    if (S.mode === "article") {
+      if (!ARTICLES.length) return pick(CHAT);
+      const p = pick(ARTICLES);
+      const clean = p.text.replace(/\s+/g, "");
+      const want = 30 + Math.floor(Math.random() * 25);
+      const start = Math.floor(Math.random() * Math.max(1, clean.length - want));
+      S.lastTitle = "《" + p.title + "》";
+      return clean.slice(start, start + want);
+    }
+    if (S.mode === "wrong") {
+      const bank = wrongBankWords();
+      if (bank.length) return pick(bank);
+    }
+    // 聊天模式：优先 2-12 字的短句
+    const pool = CHAT.filter((p) => p.length <= 12);
+    return pick(pool);
+  }
+
+  function resetRound(first) {
+    S.target = nextTarget();
+    S.typed = "";
+    el.hidden.value = "";
+    S.roundStart = performance.now();
+    el.target.classList.toggle("mono", S.mode === "pinyin" || S.mode === "num");
+    render();
+    if (first) focusInput();
+  }
+
+  function focusInput() {
+    try { el.hidden.focus({ preventScroll: true }); } catch (e) {}
+  }
+
+  // ================= 渲染 =================
+  function render() {
+    const t = S.target, typed = S.typed;
+    let html = "";
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i] === " " ? " " : esc(t[i]);
+      let cls = "c";
+      if (i < typed.length) cls = typed[i] === t[i] ? "ok" : "bad";
+      else if (i === typed.length) cls = "cur";
+      html += '<span class="' + cls + '">' + ch + "</span>";
+    }
+    el.target.innerHTML = html;
+  }
+  function esc(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ================= 统计 =================
+  function minutes() { return Math.max(S.elapsed / 60, 1 / 600); }
+  function speedValue() {
+    return S.mode === "pinyin" || S.mode === "num"
+      ? Math.round(S.correct / minutes())
+      : Math.round(S.correct / minutes());
+  }
+  function updateStats() {
+    el.speed.textContent = String(speedValue());
+    el.acc.textContent = (S.totalTyped ? Math.round((S.correct / S.totalTyped) * 100) : 100) + "%";
+    el.combo.textContent = String(S.combo);
+    el.time.textContent = String(S.duration ? Math.max(0, Math.ceil(S.remaining)) : Math.round(S.elapsed));
+    el.progress.style.width = S.duration ? Math.max(0, (S.remaining / S.duration) * 100) + "%" : "100%";
+  }
+
+  // ================= 开始 / 结束 =================
+  function start() {
+    if (S.running) return;
+    S.running = true;
+    Object.assign(S, { elapsed: 0, correct: 0, totalTyped: 0, combo: 0, maxCombo: 0,
+      backspaces: 0, rounds: 0, firstDelaySum: 0, firstDelayCount: 0, roundErrors: [], remaining: S.duration });
+    S.startAt = performance.now();
+    if (el.overlay.classList.contains("show")) el.overlay.classList.remove("show");
+    el.hint.textContent = modeDef().hint;
+    resetRound(true);
+    S.timer = setInterval(tick, 100);
+    updateStats();
+  }
+
+  function tick() {
+    if (!S.running) return;
+    S.elapsed = (performance.now() - S.startAt) / 1000;
+    if (S.duration) {
+      S.remaining = S.duration - S.elapsed;
+      if (S.remaining <= 0) { finish("时间到"); return; }
+    }
+    updateStats();
+  }
+
+  function grade(v) {
+    if (S.mode === "pinyin" || S.mode === "num") {
+      if (v >= 200) return "S · 神速";
+      if (v >= 140) return "A · 很快";
+      if (v >= 90) return "B · 合格";
+      return "C · 再练练";
+    }
+    if (v >= 45) return "S · 高手";
+    if (v >= 30) return "A · 很快";
+    if (v >= 18) return "B · 合格";
+    return "C · 再练练";
+  }
+
+  function finish(reason) {
+    if (!S.running) return;
+    S.running = false;
+    clearInterval(S.timer);
+    S.elapsed = (performance.now() - S.startAt) / 1000;
+    updateStats();
+    const v = Math.round(S.correct / minutes());
+    const acc = S.totalTyped ? Math.round((S.correct / S.totalTyped) * 100) : 100;
+    const firstAvg = S.firstDelayCount ? (S.firstDelaySum / S.firstDelayCount / 1000) : 0;
+    el.rTitle.textContent = reason || "本局结束";
+    el.rGrade.textContent = grade(v) + " ｜ 完成 " + S.rounds + " 句";
+    el.rSpeed.textContent = String(v);
+    el.rAcc.textContent = acc + "%";
+    el.rBack.textContent = String(S.backspaces);
+    el.rFirst.textContent = firstAvg.toFixed(1) + "s";
+
+    const badChars = Object.entries(S.wrongChars).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    el.rWrong.innerHTML = badChars.length
+      ? "易错字：" + badChars.map(([c, n]) => "<b>" + esc(c) + "</b>×" + n).join("  ")
+      : "没有明显易错字，不错 👏";
+
+    const key = S.mode;
+    if (!S.best[key] || v > S.best[key]) { S.best[key] = v; save("mobitype.best", S.best); }
+    el.wrongBtn.style.display = (Object.keys(S.wrongChars).length && S.mode !== "wrong") ? "block" : "none";
+    el.overlay.classList.add("show");
+    el.hidden.blur();
+  }
+
+  // ================= 输入 =================
+  el.hidden.addEventListener("input", (e) => {
+    if (e.isComposing) return;
+    if (!S.running) return;
+    const val = el.hidden.value.replace(/[\u0000-\u001F\u007F]/g, "");
+    handle(val);
+  });
+
+  function handle(val) {
+    if (val.length > S.target.length) val = val.slice(0, S.target.length);
+    if (!S.typed && val) {
+      S.firstDelaySum += performance.now() - S.roundStart;
+      S.firstDelayCount++;
+    }
+    if (val.length < S.typed.length) {
+      S.backspaces += S.typed.length - val.length;
+      S.typed = val;
+      render();
+      updateStats();
+      return;
+    }
+    for (let i = S.typed.length; i < val.length; i++) {
+      S.totalTyped++;
+      if (val[i] === S.target[i]) {
+        S.correct++; S.combo = Math.max(S.combo + 1, 0);
+        S.maxCombo = Math.max(S.maxCombo, S.combo);
+      } else {
+        S.combo = 0;
+        const ch = S.target[i];
+        if (ch && /[\u4e00-\u9fa5A-Za-z0-9]/.test(ch)) S.wrongChars[ch] = (S.wrongChars[ch] || 0) + 1;
+      }
+    }
+    S.typed = val;
+    render();
+    updateStats();
+
+    if (S.typed.length >= S.target.length) {
+      completeRound();
+    }
+  }
+
+  function completeRound() {
+    S.rounds++;
+    save("mobitype.wrongChars", S.wrongChars);
+    if (S.mode === "pinyin") {
+      // 拼音模式：正确完成后立即下一题
+      setTimeout(() => { if (S.running) { resetRound(false); } }, 120);
+    } else {
+      setTimeout(() => { if (S.running) { resetRound(false); } }, 160);
+    }
+  }
+
+  // ================= 按钮 =================
+  el.startBtn.addEventListener("click", () => { start(); focusInput(); });
+  el.stopBtn.addEventListener("click", () => finish("手动结束"));
+  el.againBtn.addEventListener("click", () => { el.overlay.classList.remove("show"); start(); focusInput(); });
+  el.wrongBtn.addEventListener("click", () => {
+    el.overlay.classList.remove("show");
+    S.mode = "wrong"; renderModes(); start(); focusInput();
+  });
+  el.target.addEventListener("click", focusInput);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && S.running) finish("切走页面，本局结束");
+  });
+
+  // ================= 初始化 =================
+  const q = new URLSearchParams(location.search).get("mode");
+  if (MODES.some((m) => m.key === q)) S.mode = q;
+  renderDurs();
+  renderModes();
+  el.target.textContent = "点「开始」，用你手机的输入法打出上方短语";
+  el.hint.textContent = "建议 26 键拼音；聊天/文章模式用中文输入，拼音键位模式切英文";
+  updateStats();
+})();
+</script>
+</body>
+</html>
